@@ -13,6 +13,7 @@ private/
 *.png
 *.wav
 processed.wav
+!docs/images/*.png
 
 # Streamlit
 .streamlit/

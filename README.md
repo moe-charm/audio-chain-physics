@@ -2,6 +2,8 @@
 
 [日本語版 README](./README.ja.md) | [Architecture](./ARCHITECTURE.md)
 
+![App screenshot](./docs/images/app-screenshot.png)
+
 A research-oriented simulator for exploring how cable parameters, source/load
 interaction, amplifier behavior, and time-domain artifacts can change an audio
 system.

@@ -2,6 +2,8 @@
 
 [English README](./README.md) | [アーキテクチャ](./ARCHITECTURE.md)
 
+![アプリのスクリーンショット](./docs/images/app-screenshot.png)
+
 ケーブルの物理特性、機器との相互作用、アンプの挙動、時間領域の崩れを
 まとめて扱う、研究中のオーディオ・シミュレータです。
 
