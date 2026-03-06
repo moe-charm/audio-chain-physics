@@ -1,0 +1,15 @@
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+env/
+venv/
+ENV/
+
+# Test outputs
+*.png
+*.wav
+processed.wav
+
+# Streamlit
+.streamlit/
