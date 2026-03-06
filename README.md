@@ -107,6 +107,7 @@ streamlit run app.py
 
 - [Japanese README](./README.ja.md)
 - [Architecture](./ARCHITECTURE.md)
+- [Paper drafts](./paper/README.md)
 
 Internal working notes are kept under `private/` and are not intended as the
 main public-facing documentation.

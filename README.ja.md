@@ -114,6 +114,7 @@ streamlit run app.py
 
 - [English README](./README.md)
 - [アーキテクチャ](./ARCHITECTURE.md)
+- [論文ドラフト](./paper/README.md)
 
 より細かい作業メモは `private/` にありますが、公開向けの主文書ではありません。
 
