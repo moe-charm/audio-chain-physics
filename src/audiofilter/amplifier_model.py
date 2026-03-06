@@ -38,16 +38,23 @@ class AmplifierModel:
             prev_voltage = out_data[i] * self.reference_peak_voltage
         return out_data
 
-    def apply_power_sag(self, data, fs):
+    def apply_power_sag(self, data, fs, load_current=None, drive_stress=0.0):
         """
         電源サグ (大音量時に電圧が落ちて音が太く/歪む現象)
         """
-        # 音圧のエンベロープ(エネルギー消費)を計算
-        alpha = np.exp(-1.0 / (0.1 * fs)) # 100ms
-        energy = lfilter([1 - alpha], [1, -alpha], data**2)
-        
-        # 電源の余裕度。コンデンサ量が多いほど、エネルギー消費による電圧降下が少ない
-        sag_factor = np.clip(energy / (self.cap_j + 1e-6), 0, 0.2)
+        if load_current is None:
+            demand = np.asarray(data, dtype=np.float64) ** 2
+        else:
+            demand = np.asarray(load_current, dtype=np.float64) ** 2
+
+        alpha_fast = np.exp(-1.0 / (0.03 * fs))  # 30ms
+        alpha_slow = np.exp(-1.0 / (0.18 * fs))  # 180ms
+        energy_fast = lfilter([1 - alpha_fast], [1, -alpha_fast], demand)
+        energy_slow = lfilter([1 - alpha_slow], [1, -alpha_slow], demand)
+        energy = 0.65 * energy_fast + 0.35 * energy_slow
+
+        stress_scale = 1.0 + 3.0 * np.clip(drive_stress, 0.0, 1.5)
+        sag_factor = np.clip((energy * stress_scale) / (self.cap_j + 1e-6), 0, 0.35)
         gain_mod = 1.0 - sag_factor
         
         return data * gain_mod
@@ -61,14 +68,14 @@ class AmplifierModel:
         out = data + self.h2 * (data**2) + self.h3 * (data**3)
         return out
 
-    def process(self, data, fs):
+    def process(self, data, fs, load_current=None, drive_stress=0.0):
         """
         アンプの全処理を一括適用
         """
         # 1. スルーレート制限
         out = self.apply_slew_rate_limit(data, fs)
         # 2. 電源サグ
-        out = self.apply_power_sag(out, fs)
+        out = self.apply_power_sag(out, fs, load_current=load_current, drive_stress=drive_stress)
         # 3. 高調波歪み
         out = self.apply_harmonics(out)
         

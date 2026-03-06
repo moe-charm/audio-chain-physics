@@ -2,13 +2,39 @@ import numpy as np
 from scipy.constants import mu_0, epsilon_0
 
 class CableModel:
-    MATERIALS = {
-        "Copper": 1.68e-8,
-        "Silver": 1.59e-8,
-        "Gold": 2.44e-8,
-        "Aluminum": 2.82e-8,
-        "Platinum": 10.6e-8
+    MATERIAL_PROFILES = {
+        "Copper": {
+            "rho": 1.68e-8,
+            "surface_sheen": 0.20,
+            "contact_stability": 0.68,
+            "oxide_penalty": 0.32,
+        },
+        "Silver": {
+            "rho": 1.59e-8,
+            "surface_sheen": 0.85,
+            "contact_stability": 0.88,
+            "oxide_penalty": 0.10,
+        },
+        "Gold": {
+            "rho": 2.44e-8,
+            "surface_sheen": 0.05,
+            "contact_stability": 0.98,
+            "oxide_penalty": 0.02,
+        },
+        "Aluminum": {
+            "rho": 2.82e-8,
+            "surface_sheen": -0.18,
+            "contact_stability": 0.42,
+            "oxide_penalty": 0.65,
+        },
+        "Platinum": {
+            "rho": 10.6e-8,
+            "surface_sheen": -0.05,
+            "contact_stability": 0.92,
+            "oxide_penalty": 0.06,
+        },
     }
+    MATERIALS = {name: profile["rho"] for name, profile in MATERIAL_PROFILES.items()}
 
     # 絶縁体の特性: (比誘電率 epsilon_r, 誘電正接 tan_delta)
     DIELECTRICS = {
@@ -35,16 +61,61 @@ class CableModel:
         self.diameter = diameter
         self.spacing = spacing
         self.material = material
+        self.dielectric_name = dielectric
         
         # 絶縁体設定
         dielectric_params = self.DIELECTRICS.get(dielectric, self.DIELECTRICS["Polyethylene (PE)"])
         self.epsilon_r = dielectric_params[0]
         self.tan_delta = dielectric_params[1]
         
-        self.rho = self.MATERIALS.get(material, 1.68e-8)
+        self.material_profile = self.MATERIAL_PROFILES.get(material, self.MATERIAL_PROFILES["Copper"])
+        self.rho = self.material_profile["rho"]
         self.geometry = geometry
         self.radius = diameter / 2.0
         self.contact_res = contact_res
+
+    def get_material_profile(self):
+        return dict(self.material_profile)
+
+    def _get_static_lc_per_meter(self):
+        epsilon = epsilon_0 * self.epsilon_r
+        effective_spacing = np.maximum(self.spacing, self.diameter + 1e-6)
+
+        if self.geometry == "Parallel":
+            l_ext = (mu_0 / np.pi) * np.arccosh(effective_spacing / self.diameter)
+            l_int = (mu_0 / (8 * np.pi)) * 2
+            l_val = l_ext + l_int
+            c_val = (np.pi * epsilon) / np.arccosh(effective_spacing / self.diameter)
+        else:
+            l_ext = (mu_0 / (2 * np.pi)) * np.log(effective_spacing / self.diameter)
+            l_int = mu_0 / (8 * np.pi)
+            l_val = l_ext + l_int
+            c_val = (2 * np.pi * epsilon) / np.log(effective_spacing / self.diameter)
+
+        return l_val, c_val
+
+    def get_total_capacitance(self):
+        _, c_per_meter = self._get_static_lc_per_meter()
+        return c_per_meter * self.length
+
+    def get_total_inductance(self):
+        l_per_meter, _ = self._get_static_lc_per_meter()
+        return l_per_meter * self.length
+
+    def get_dc_series_resistance(self):
+        r_dc = self.rho / (np.pi * self.radius**2)
+        loop_factor = 2.0 if self.geometry == "Parallel" else 1.2
+        return r_dc * self.length * loop_factor + self.contact_res
+
+    def get_return_impedance(self, frequencies):
+        freqs = np.asarray(frequencies, dtype=np.float64)
+        freqs = np.maximum(freqs, 1.0)
+        omega = 2.0 * np.pi * freqs
+        material = self.get_material_profile()
+        r_return = 0.45 * self.get_dc_series_resistance() + self.contact_res * (1.0 + 0.50 * material["oxide_penalty"])
+        l_return = self.get_total_inductance() * (0.55 if self.geometry == "Coaxial" else 0.40)
+        skin_scale = 1.0 + 0.35 * np.sqrt(freqs / 20000.0)
+        return r_return * skin_scale + 1j * omega * l_return
         
     def get_rlgc(self, frequencies):
         """
@@ -73,21 +144,9 @@ class CableModel:
             R = R_skin * 1.2 # 同軸の外部導体込みの簡易近似
             
         # --- 2 & 3. インダクタンス L と キャパシタンス C ---
-        epsilon = epsilon_0 * self.epsilon_r
-        effective_spacing = np.maximum(self.spacing, self.diameter + 1e-6)
-        
-        if self.geometry == "Parallel":
-            l_ext = (mu / np.pi) * np.arccosh(effective_spacing / self.diameter)
-            l_int = (mu / (8 * np.pi)) * 2 # 内部L
-            L = np.full_like(frequencies, l_ext + l_int)
-            c_val = (np.pi * epsilon) / np.arccosh(effective_spacing / self.diameter)
-            C = np.full_like(frequencies, c_val)
-        else:
-            l_ext = (mu / (2 * np.pi)) * np.log(effective_spacing / self.diameter)
-            l_int = mu / (8 * np.pi)
-            L = np.full_like(frequencies, l_ext + l_int)
-            c_val = (2 * np.pi * epsilon) / np.log(effective_spacing / self.diameter)
-            C = np.full_like(frequencies, c_val)
+        l_val, c_val = self._get_static_lc_per_meter()
+        L = np.full_like(frequencies, l_val)
+        C = np.full_like(frequencies, c_val)
         
         # --- 4. コンダクタンス G (誘電損失) ---
         # G = omega * C * tan_delta
@@ -96,7 +155,7 @@ class CableModel:
         
         return R, L, C, G
 
-    def calculate_transfer_function(self, frequencies, z_source=0.1, z_load_r=8.0, z_load_l=0.5e-3):
+    def calculate_transfer_function(self, frequencies, z_source=0.1, z_load_r=8.0, z_load_l=0.5e-3, z_load=None):
         """
         伝達関数 H(f) を計算する (接点抵抗も考慮)
         """
@@ -106,8 +165,11 @@ class CableModel:
         omega = 2 * np.pi * frequencies
         R, L, C, G = self.get_rlgc(frequencies)
         
-        z_load = z_load_r + 1j * omega * z_load_l
-        
+        if z_load is None:
+            z_load = z_load_r + 1j * omega * z_load_l
+        else:
+            z_load = np.asarray(z_load, dtype=np.complex128)
+
         gamma = np.sqrt((R + 1j * omega * L) * (G + 1j * omega * C))
         z0 = np.sqrt((R + 1j * omega * L) / (G + 1j * omega * C))
         
