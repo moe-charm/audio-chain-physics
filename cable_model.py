@@ -6,7 +6,8 @@ class CableModel:
         "Copper": 1.68e-8,
         "Silver": 1.59e-8,
         "Gold": 2.44e-8,
-        "Aluminum": 2.82e-8
+        "Aluminum": 2.82e-8,
+        "Platinum": 10.6e-8
     }
 
     # 絶縁体の特性: (比誘電率 epsilon_r, 誘電正接 tan_delta)
