@@ -23,6 +23,10 @@ The current framing is:
   Current abstract draft in English.
 - `manuscript.md`
   Main manuscript scaffold and draft text.
+- `en/main.tex`
+  English TeX manuscript draft.
+- `ja/main.tex`
+  Japanese TeX manuscript draft.
 
 ## Writing Position
 
@@ -39,3 +43,32 @@ The recommended claim style for the first paper is:
 - add measured comparison data
 - add ablation tables
 - choose a target venue and format
+
+## Build Notes
+
+Suggested starting point:
+
+- English: `paper/en/main.tex`
+- Japanese: `paper/ja/main.tex`
+
+Recommended engines:
+
+- English: `pdflatex` or `lualatex`
+- Japanese: `lualatex`
+
+Example commands:
+
+```bash
+cd paper/en
+pdflatex main.tex
+pdflatex main.tex
+```
+
+```bash
+cd paper/ja
+lualatex main.tex
+lualatex main.tex
+```
+
+The current workspace used to prepare these files did not have a LaTeX
+distribution installed, so the TeX sources were written but not compiled here.
