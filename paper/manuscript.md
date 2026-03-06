@@ -139,20 +139,22 @@ bench-validated conclusions.
 
 The next validation steps should include:
 
-1. bench measurements with multiple RCA lengths and speaker-cable lengths
+1. direct comparison between simulated results and bench measurements obtained with multiple RCA lengths and speaker-cable lengths
 2. square-wave or step-response comparison under varying capacitive load
 3. ablation studies isolating capacitance, shielding, and contact degradation
-4. measured impedance import for real speakers, headphones, or IEMs
-5. controlled listening studies where practical
+4. measured impedance import for real loudspeakers, headphones, and IEMs
+5. extension of the simplified headphone/IEM path toward richer load modeling
+6. controlled listening studies where practical
 
 ## 7. Limitations
 
 The present implementation still has important limitations.
 
+- validation against measured hardware data is still incomplete
 - speaker loading is synthetic rather than measurement-driven
-- RF ingress and hum are approximated, not modeled as full stochastic processes
-- bad-contact behavior is a soft deterministic approximation
+- RF ingress, hum, and contact faults are not yet modeled as full stochastic processes
 - real amplifier Bode measurements are not yet imported
+- headphone and IEM handling remains simpler than the loudspeaker path
 - listening validation remains incomplete
 
 These limitations are not side notes; they define the boundary of the current
@@ -174,6 +176,11 @@ particular, cable-related veil, treble sheen and extension, soundstage change,
 and the impression of a denser sound have not yet been reproduced under
 conditions that feel fully satisfactory. Those gaps are not failures to hide;
 they are the clearest indication of where further research is required.
+
+The most important next steps are therefore clear: closer comparison with
+measured hardware data, replacement of the synthetic loudspeaker path with
+measured impedance where possible, more complete stochastic noise and contact
+models, richer headphone/IEM modeling, and controlled listening validation.
 
 The value of the present work is therefore twofold. First, it replaces vague
 debate with a structured model that can be inspected, extended, and measured.

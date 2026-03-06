@@ -203,10 +203,11 @@ conclusions.
 The next validation steps should include:
 
 \begin{enumerate}
-  \item bench measurements with multiple RCA lengths and speaker-cable lengths
+  \item direct comparison between simulated results and bench measurements obtained with multiple RCA lengths and speaker-cable lengths
   \item square-wave or step-response comparison under varying capacitive load
   \item ablation studies isolating capacitance, shielding, and contact degradation
-  \item measured impedance import for real speakers, headphones, or IEMs
+  \item measured impedance import for real loudspeakers, headphones, and IEMs
+  \item extension of the simplified headphone/IEM path toward richer load modeling
   \item controlled listening studies where practical
 \end{enumerate}
 
@@ -215,10 +216,11 @@ The next validation steps should include:
 The present implementation still has important limitations.
 
 \begin{itemize}
+  \item validation against measured hardware data is still incomplete
   \item speaker loading is synthetic rather than measurement-driven
-  \item RF ingress and hum are approximated, not modeled as full stochastic processes
-  \item bad-contact behavior is a soft deterministic approximation
+  \item RF ingress, hum, and contact faults are not yet modeled as full stochastic processes
   \item real amplifier Bode measurements are not yet imported
+  \item headphone and IEM handling remains simpler than the loudspeaker path
   \item listening validation remains incomplete
 \end{itemize}
 
@@ -242,6 +244,11 @@ and the impression of a denser sound have not yet been reproduced under
 conditions that feel fully satisfactory. Those gaps are not failures to hide;
 they are the clearest indication of where further research is required.
 
+The most important next steps are therefore clear: closer comparison with
+measured hardware data, replacement of the synthetic loudspeaker path with
+measured impedance where possible, more complete stochastic noise and contact
+models, richer headphone/IEM modeling, and controlled listening validation.
+
 The value of the present work is therefore twofold. First, it replaces vague
 debate with a structured model that can be inspected, extended, and measured.
 Second, it clearly separates what has already been reproduced from what still
@@ -255,4 +262,3 @@ assistance and technical discussion with ChatGPT and Gemini. These tools are
 credited as development aids, not as scientific authors.
 
 \end{document}
-
