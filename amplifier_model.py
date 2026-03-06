@@ -6,6 +6,7 @@ class AmplifierModel:
                  input_impedance=47000, 
                  output_impedance=0.1,
                  slew_rate=50.0, # V/us
+                 reference_peak_voltage=400.0,
                  capacitor_joules=100, # 電源コンデンサの「踏ん張り力」
                  harmonics_2nd=0.001, # 2次高調波 (真空管っぽさ)
                  harmonics_3rd=0.0005 # 3次高調波
@@ -13,6 +14,7 @@ class AmplifierModel:
         self.zin = input_impedance
         self.zout = output_impedance
         self.sr = slew_rate
+        self.reference_peak_voltage = reference_peak_voltage
         self.cap_j = capacitor_joules
         self.h2 = harmonics_2nd
         self.h3 = harmonics_3rd
@@ -22,14 +24,18 @@ class AmplifierModel:
         スルーレート制限 (立ち上がりの鋭さ制限)
         """
         dt = 1.0 / fs
-        max_delta = self.sr * 1e6 * dt # 1サンプルあたりの最大電圧変化
-        
-        # 簡易的なクリップ処理でスルーレート制限を模擬
-        out_data = np.copy(data)
+        max_delta_volts = self.sr * 1e6 * dt
+
+        # 正規化波形を出力段の電圧スイングに写像してから制限する
+        out_data = np.array(data, dtype=np.float64, copy=True)
+        prev_voltage = out_data[0] * self.reference_peak_voltage
         for i in range(1, len(out_data)):
-            delta = out_data[i] - out_data[i-1]
-            if abs(delta) > max_delta:
-                out_data[i] = out_data[i-1] + np.sign(delta) * max_delta
+            target_voltage = out_data[i] * self.reference_peak_voltage
+            delta = target_voltage - prev_voltage
+            if abs(delta) > max_delta_volts:
+                target_voltage = prev_voltage + np.sign(delta) * max_delta_volts
+                out_data[i] = target_voltage / self.reference_peak_voltage
+            prev_voltage = out_data[i] * self.reference_peak_voltage
         return out_data
 
     def apply_power_sag(self, data, fs):

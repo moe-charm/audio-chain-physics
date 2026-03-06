@@ -130,7 +130,7 @@ if __name__ == "__main__":
     # テスト計算
     fs = np.logspace(1, 6, 500) # 10Hz to 1MHz
     model = CableModel(length=5.0, diameter=2.0e-3, spacing=10.0e-3) # 5m スピーカーケーブル
-    h_f = model.calculate_transfer_function(fs, z_source=0.1, z_load=8.0)
+    h_f = model.calculate_transfer_function(fs, z_source=0.1, z_load_r=8.0)
     
     plt.figure(figsize=(10, 6))
     plt.subplot(2, 1, 1)

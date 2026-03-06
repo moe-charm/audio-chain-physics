@@ -3,16 +3,77 @@ import numpy as np
 import matplotlib.pyplot as plt
 import soundfile as sf
 import io
+from scipy.signal import fftconvolve
 from cable_model import CableModel
 from audio_processor import AudioProcessor
 from amplifier_model import AmplifierModel
+
+DEFAULT_SAMPLE_RATE = 44100
+FIR_TAPS = 2048
+ANALYSIS_IR_SAMPLES = 8192
+
+
+def sync_uploaded_audio():
+    uploaded_file = st.session_state.get("uploaded_wav")
+    if uploaded_file is None:
+        if st.session_state.get("uploaded_audio_signature") is not None:
+            st.session_state.audio_data = None
+            st.session_state.sample_rate = DEFAULT_SAMPLE_RATE
+            st.session_state.uploaded_audio_signature = None
+        return
+
+    signature = (uploaded_file.name, uploaded_file.size)
+    if signature == st.session_state.get("uploaded_audio_signature"):
+        return
+
+    uploaded_file.seek(0)
+    data, sr = sf.read(uploaded_file)
+    st.session_state.audio_data = data
+    st.session_state.sample_rate = sr
+    st.session_state.uploaded_audio_signature = signature
+
+
+def convolve_signal(data, impulse_response):
+    if data.ndim > 1:
+        processed = np.zeros_like(data, dtype=np.float64)
+        for i in range(data.shape[1]):
+            processed[:, i] = fftconvolve(data[:, i], impulse_response, mode="same")
+        return processed
+    return fftconvolve(data, impulse_response, mode="same")
+
+
+def apply_amplifier(data, amplifier, sample_rate):
+    if data.ndim > 1:
+        processed = np.zeros_like(data, dtype=np.float64)
+        for i in range(data.shape[1]):
+            processed[:, i] = amplifier.process(data[:, i], sample_rate)
+        return processed
+    return amplifier.process(data, sample_rate)
+
+
+def calculate_tail_ratio(ir_data, sample_rate):
+    peak_idx = int(np.argmax(np.abs(ir_data)))
+    peak_window = max(1, int(0.0001 * sample_rate))
+    tail_window_end = max(peak_window + 1, int(0.005 * sample_rate))
+
+    energy_peak = np.sum(ir_data[max(0, peak_idx - peak_window):peak_idx + peak_window] ** 2)
+    energy_tail = np.sum(ir_data[peak_idx + peak_window:min(len(ir_data), peak_idx + tail_window_end)] ** 2)
+    tail_ratio_db = 10 * np.log10(energy_tail / energy_peak) if (energy_peak > 0 and energy_tail > 0) else -100.0
+    return peak_idx, tail_ratio_db
+
 
 st.set_page_config(page_title="Audio System Chain Simulator v1.5", layout="wide")
 
 if 'audio_data' not in st.session_state:
     st.session_state.audio_data = None
 if 'sample_rate' not in st.session_state:
-    st.session_state.sample_rate = 44100
+    st.session_state.sample_rate = DEFAULT_SAMPLE_RATE
+if 'audio_source' not in st.session_state:
+    st.session_state.audio_source = "アップロード"
+if 'uploaded_audio_signature' not in st.session_state:
+    st.session_state.uploaded_audio_signature = None
+
+sync_uploaded_audio()
 
 st.title("オーディオ・システム・チェーン・シミュレーター v1.5")
 
@@ -53,8 +114,8 @@ with col_config:
         z_in_amp = st.number_input("入力インピーダンス (Ω)", 1000.0, 100000.0, 47000.0)
 
         amp_model = AmplifierModel(input_impedance=z_in_amp, output_impedance=z_out_amp,
-                                 slew_rate=sr_val, capacitor_joules=cap_val,
-                                 harmonics_2nd=h2, harmonics_3rd=h3)
+                                  slew_rate=sr_val, capacitor_joules=cap_val,
+                                  harmonics_2nd=h2, harmonics_3rd=h3)
 
     # [3] SPK/IEM Cable
     with st.expander("🧵 [3] 下流ケーブル (SPK/IEM)", expanded=True):
@@ -75,13 +136,52 @@ with col_config:
         z_l_r = st.number_input("抵抗 (Ω)", 1.0, 1000.0, z_l_r)
         z_l_l = st.number_input("インダクタンス (mH)", 0.0, 10.0, z_l_l)
 
+load_inductance_h = z_l_l * 1e-3
+
+
+def process_audio_chain(data, sample_rate, normalize_output=True):
+    proc = AudioProcessor(sample_rate=sample_rate)
+    processed = np.asarray(data, dtype=np.float64)
+
+    ir_line = proc.generate_fir_filter(line_model, n_taps=FIR_TAPS, z_source=l_z_src, z_load_r=z_in_amp, z_load_l=0.0)
+    processed = convolve_signal(processed, ir_line)
+    processed = proc.apply_dielectric_absorption(processed, l_die)
+
+    processed = apply_amplifier(processed, amp_model, sample_rate)
+
+    ir_spk = proc.generate_fir_filter(
+        spk_model,
+        n_taps=FIR_TAPS,
+        z_source=z_out_amp,
+        z_load_r=z_l_r,
+        z_load_l=load_inductance_h,
+    )
+    processed = convolve_signal(processed, ir_spk)
+    processed = proc.apply_dielectric_absorption(processed, s_die)
+    processed = proc.apply_thermal_modulation(processed, s_len, s_dia)
+
+    if normalize_output:
+        max_val = np.max(np.abs(processed))
+        if max_val > 0:
+            processed = processed / max_val
+
+    return processed
+
+
+analysis_sr = (
+    st.session_state.sample_rate
+    if st.session_state.audio_source == "アップロード" and st.session_state.audio_data is not None
+    else DEFAULT_SAMPLE_RATE
+)
+plot_max_freq = min(20000.0, analysis_sr * 0.49)
+
 with col_plot:
     st.header("📊 システム解析モニター")
     
     # 総合特性計算
-    fs_plot = np.logspace(1, 5, 500)
+    fs_plot = np.logspace(np.log10(10.0), np.log10(max(plot_max_freq, 20.0)), 500)
     h_line = line_model.calculate_transfer_function(fs_plot, z_source=l_z_src, z_load_r=z_in_amp, z_load_l=0)
-    h_spk = spk_model.calculate_transfer_function(fs_plot, z_source=z_out_amp, z_load_r=z_l_r, z_load_l=z_l_l*1e-3)
+    h_spk = spk_model.calculate_transfer_function(fs_plot, z_source=z_out_amp, z_load_r=z_l_r, z_load_l=load_inductance_h)
     h_total = h_line * h_spk
 
     # ダンピングファクターの計算と表示
@@ -97,39 +197,36 @@ with col_plot:
     
     ax1.semilogx(fs_plot, 20 * np.log10(np.abs(h_total)), color="red", lw=2)
     ax1.set_title("周波数特性 (Magnitude Response)")
-    ax1.set_ylabel("Gain (dB)"); ax1.grid(True, alpha=0.3); ax1.set_xlim(20, 20000)
+    ax1.set_ylabel("Gain (dB)"); ax1.grid(True, alpha=0.3); ax1.set_xlim(20, plot_max_freq)
 
     phase_rad = np.unwrap(np.angle(h_total))
     ax2.semilogx(fs_plot, np.rad2deg(phase_rad), color="orange")
     ax2.set_title("位相特性 (Phase Response)")
-    ax2.set_ylabel("Phase (deg)"); ax2.grid(True, alpha=0.3); ax2.set_xlim(20, 20000)
+    ax2.set_ylabel("Phase (deg)"); ax2.grid(True, alpha=0.3); ax2.set_xlim(20, plot_max_freq)
 
     omega = 2 * np.pi * fs_plot
     gd = -np.gradient(phase_rad, omega) * 1e6
     ax_gd.semilogx(fs_plot, gd, color="purple")
     ax_gd.set_title("群遅延 (Group Delay) - 音場の正確さ指標")
-    ax_gd.set_ylabel("Delay (μs)"); ax_gd.grid(True, alpha=0.3); ax_gd.set_xlim(20, 20000)
-    gd_valid = gd[(fs_plot >= 20) & (fs_plot <= 20000)]
+    ax_gd.set_ylabel("Delay (μs)"); ax_gd.grid(True, alpha=0.3); ax_gd.set_xlim(20, plot_max_freq)
+    gd_valid = gd[(fs_plot >= 20) & (fs_plot <= plot_max_freq)]
     if len(gd_valid) > 0: ax_gd.set_ylim(np.min(gd_valid) - 10, np.max(gd_valid) + 10)
 
-    proc_dummy = AudioProcessor(sample_rate=44100)
-    ir_total = proc_dummy.generate_fir_filter(spk_model, n_taps=2048)
-    peak_idx = np.argmax(np.abs(ir_total))
-    t_ir = np.arange(len(ir_total)) / 44100 * 1000
-    
-    # TailRatio計算
-    window_samples_peak = int(0.0001 * 44100)
-    energy_peak = np.sum(ir_total[max(0, peak_idx - window_samples_peak):peak_idx + window_samples_peak]**2)
-    window_samples_tail_end = int(0.005 * 44100)
-    energy_tail = np.sum(ir_total[peak_idx + window_samples_peak:min(len(ir_total), peak_idx + window_samples_tail_end)]**2)
-    tail_ratio_db = 10 * np.log10(energy_tail / energy_peak) if (energy_peak > 0 and energy_tail > 0) else -100.0
+    analysis_impulse = np.zeros(ANALYSIS_IR_SAMPLES)
+    analysis_impulse[ANALYSIS_IR_SAMPLES // 2] = 1.0
+    ir_total = process_audio_chain(analysis_impulse, analysis_sr, normalize_output=False)
+    peak_idx, tail_ratio_db = calculate_tail_ratio(ir_total, analysis_sr)
+    peak_val = np.max(np.abs(ir_total))
+    ir_display = ir_total / peak_val if peak_val > 0 else ir_total
+    t_ir = (np.arange(len(ir_display)) - peak_idx) / analysis_sr * 1000.0
     
     with col_m2:
         st.metric("音の質感 (TailRatio)", f"{tail_ratio_db:.1f} dB", help="波形の「尻尾」の量。値が高いほど『音が濃く/ふくよか』になります。")
 
-    ax3.plot(t_ir, ir_total, color="cyan")
-    ax3.set_title("過渡応答 (Impulse Response) - 拡大")
-    ax3.set_xlim(t_ir[peak_idx] - 0.5, t_ir[peak_idx] + 2.0); ax3.grid(True, alpha=0.3)
+    ax3.plot(t_ir, ir_display, color="cyan")
+    ax3.set_title("過渡応答 (Impulse Response) - システム全体")
+    ax3.set_xlim(-0.5, 2.0); ax3.grid(True, alpha=0.3)
+    ax3.set_xlabel("Time (ms)")
 
     plt.tight_layout()
     st.pyplot(fig)
@@ -137,57 +234,35 @@ with col_plot:
     # --- 再生セクション ---
     st.divider()
     st.subheader("🎵 試聴プレイヤー")
-    audio_source = st.radio("音声ソース", ["アップロード", "サインスイープ", "ホワイトノイズ"], horizontal=True, index=0)
+    audio_source = st.radio(
+        "音声ソース",
+        ["アップロード", "サインスイープ", "ホワイトノイズ"],
+        horizontal=True,
+        key="audio_source",
+    )
     
     current_data = None
-    current_sr = 44100
+    current_sr = DEFAULT_SAMPLE_RATE
     if audio_source == "アップロード":
-        uploaded_file = st.file_uploader("WAVファイルをアップロード", type=["wav"])
-        if uploaded_file:
-            data, sr = sf.read(uploaded_file)
-            st.session_state.audio_data = data; st.session_state.sample_rate = sr
-        current_data = st.session_state.audio_data; current_sr = st.session_state.sample_rate
+        st.file_uploader("WAVファイルをアップロード", type=["wav"], key="uploaded_wav")
+        current_data = st.session_state.audio_data
+        current_sr = st.session_state.sample_rate if current_data is not None else DEFAULT_SAMPLE_RATE
     elif audio_source == "ホワイトノイズ":
-        sr = 44100; data = np.random.normal(0, 0.1, int(sr * 3.0))
+        sr = DEFAULT_SAMPLE_RATE; data = np.random.normal(0, 0.1, int(sr * 3.0))
         current_data = data; current_sr = sr
     else: # サインスイープ
-        sr = 44100; t = np.linspace(0, 3.0, int(44100 * 3.0))
+        sr = DEFAULT_SAMPLE_RATE; t = np.linspace(0, 3.0, int(DEFAULT_SAMPLE_RATE * 3.0), endpoint=False)
         data = 0.5 * np.sin(2 * np.pi * 20 * ( (20000/20)**(t/3.0) - 1 ) / ( np.log(20000/20)/3.0 ))
         current_data = data; current_sr = sr
 
     if current_data is None and audio_source == "アップロード":
         st.warning("⚠️ WAVファイルをアップロードしてください。")
-        run_button = st.button("▶ システム全体を通して再生 (聴き比べ)", use_container_width=True, disabled=True)
+        st.button("▶ システム全体を通して再生 (聴き比べ)", use_container_width=True, disabled=True)
     else:
         if st.button("▶ システム全体を通して再生 (聴き比べ)", use_container_width=True):
             with st.spinner("信号がチェーンを通過中..."):
                 data = current_data; sr = current_sr
-                proc = AudioProcessor(sample_rate=sr)
-                
-                # 1. RCA
-                ir_line = proc.generate_fir_filter(line_model, z_source=l_z_src, z_load_r=z_in_amp, z_load_l=0)
-                from scipy.signal import fftconvolve
-                if len(data.shape) > 1:
-                    processed = np.zeros_like(data)
-                    for i in range(data.shape[1]): processed[:, i] = fftconvolve(data[:, i], ir_line, mode='same')
-                else: processed = fftconvolve(data, ir_line, mode='same')
-                processed = proc.apply_dielectric_absorption(processed, l_die)
-                
-                # 2. Amp
-                if len(processed.shape) > 1:
-                    for i in range(processed.shape[1]): processed[:, i] = amp_model.process(processed[:, i], sr)
-                else: processed = amp_model.process(processed, sr)
-                
-                # 3. SPK
-                ir_spk = proc.generate_fir_filter(spk_model, z_source=z_out_amp, z_load_r=z_l_r, z_load_l=z_l_l*1e-3)
-                if len(processed.shape) > 1:
-                    for i in range(processed.shape[1]): processed[:, i] = fftconvolve(processed[:, i], ir_spk, mode='same')
-                else: processed = fftconvolve(processed, ir_spk, mode='same')
-                processed = proc.apply_dielectric_absorption(processed, s_die)
-                processed = proc.apply_thermal_modulation(processed, s_len, s_dia)
-                
-                max_val = np.max(np.abs(processed))
-                if max_val > 0: processed /= max_val
+                processed = process_audio_chain(data, sr, normalize_output=True)
                 
                 st.write("---")
                 st.markdown("**▼ オリジナル (Original Source)**")
