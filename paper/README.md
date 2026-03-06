@@ -14,6 +14,8 @@ The current framing is:
 - it can already demonstrate measurable degradation under clearly poor cable
   conditions
 - it does not yet claim to fully explain every listening impression
+- subtle qualities such as veil, treble sheen, extension, soundstage shift, or
+  density still require further study
 
 ## Files
 
@@ -28,8 +30,8 @@ The recommended claim style for the first paper is:
 
 - not "we proved every cable claim"
 - but "we built an integrated physical/circuit/DSP/perceptual simulation
-  framework and showed that stressed cable conditions can measurably degrade
-  system behavior"
+  framework, showed that stressed cable conditions can measurably degrade
+  system behavior, and clarified what still remains unexplained"
 
 ## Next Steps
 
@@ -37,4 +39,3 @@ The recommended claim style for the first paper is:
 - add measured comparison data
 - add ablation tables
 - choose a target venue and format
-

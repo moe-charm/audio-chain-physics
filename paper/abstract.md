@@ -18,9 +18,11 @@ drive loss, crosstalk estimate, and shield-ingress estimate.
 In its current form, the simulator already reproduces a practically important
 result: sufficiently poor operating conditions, such as long or degraded RCA
 runs and very long speaker-cable runs, can produce measurable degradation that
-extends beyond a trivial level trim. The present work should therefore be read
-as an integrated simulation framework and hypothesis-generation tool rather
-than a final proof of all cable audibility claims. We discuss the model
+extends beyond a trivial level trim. At the same time, subtler listening
+impressions reported by the author, including cable-related veil, treble sheen,
+extension, soundstage change, and increased density, are not yet reproduced
+under conditions that feel fully convincing. The present work should therefore
+be read as an integrated simulation framework and hypothesis-generation tool
+rather than a final proof of all cable audibility claims. We discuss the model
 structure, its current limitations, and the next validation steps required for
 bench measurement and controlled listening experiments.
-

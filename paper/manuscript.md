@@ -125,8 +125,14 @@ The current implementation already supports several qualitative findings.
   drive-loss-related metrics.
 - A complex load model produces more realistic "loss of grip" behavior than a
   simple resistive-inductive load alone.
+- Under extreme conditions, the resulting degradation is easy to reproduce in a
+  way that is perceptually understandable.
 
-These results should be interpreted as simulation findings, not yet as fully
+At the same time, the simulator does not yet reproduce the author's full
+listening experience under conditions that feel sufficiently persuasive. In
+particular, qualities such as veil, treble sheen, extension, soundstage shift,
+and increased density remain only partially explained. These results should
+therefore be interpreted as simulation findings, not yet as fully
 bench-validated conclusions.
 
 ## 6. Validation Plan
@@ -156,9 +162,27 @@ claims.
 
 This work introduces an integrated simulation framework for studying
 cable-related degradation in audio systems at the level of the full signal
-chain. The main value of the project is not that it closes the topic, but that
-it replaces vague debate with a structured model that can be inspected,
-extended, measured against hardware, and eventually tested against listening.
+chain. The current conclusion is intentionally limited but meaningful.
 
-For a first paper, that is already a meaningful result.
+The simulator can already reproduce, in a perceptually understandable way,
+degradation caused by extreme operating conditions. This supports the practical
+claim that audio quality can degrade when cables are used under sufficiently
+poor conditions.
 
+However, the author's own listening experience is not yet fully explained. In
+particular, cable-related veil, treble sheen and extension, soundstage change,
+and the impression of a denser sound have not yet been reproduced under
+conditions that feel fully satisfactory. Those gaps are not failures to hide;
+they are the clearest indication of where further research is required.
+
+The value of the present work is therefore twofold. First, it replaces vague
+debate with a structured model that can be inspected, extended, and measured.
+Second, it clearly separates what has already been reproduced from what still
+remains unresolved. For a first paper, that is already a meaningful and honest
+result.
+
+## 9. Acknowledgements
+
+The implementation and drafting process benefited from iterative development
+assistance and technical discussion with ChatGPT and Gemini. These tools are
+credited as development aids, not as scientific authors.
