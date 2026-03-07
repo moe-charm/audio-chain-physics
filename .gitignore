@@ -14,6 +14,9 @@ private/
 *.wav
 processed.wav
 !docs/images/*.png
+paper/**/*.aux
+paper/**/*.log
+paper/**/*.out
 
 # Streamlit
 .streamlit/
