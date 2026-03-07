@@ -64,6 +64,24 @@ def get_audio_source_data(audio_source):
     return sweep, sr
 
 
+def audio_to_wav_bytes(data, sample_rate):
+    safe = np.nan_to_num(np.asarray(data, dtype=np.float64), nan=0.0, posinf=0.0, neginf=0.0)
+    buf = io.BytesIO()
+    sf.write(buf, safe, sample_rate, format="WAV", subtype="PCM_16")
+    return buf.getvalue()
+
+
+def build_preview_signature(audio_source, current_sr, current_data, **settings):
+    data_shape = tuple(current_data.shape) if current_data is not None else None
+    return (
+        audio_source,
+        current_sr,
+        data_shape,
+        tuple(sorted(settings.items())),
+        st.session_state.get("uploaded_audio_signature"),
+    )
+
+
 st.set_page_config(page_title="Audio System Chain Simulator v1.7", layout="wide")
 
 if "audio_data" not in st.session_state:
@@ -74,6 +92,8 @@ if "audio_source" not in st.session_state:
     st.session_state.audio_source = "アップロード"
 if "uploaded_audio_signature" not in st.session_state:
     st.session_state.uploaded_audio_signature = None
+if "preview_payload" not in st.session_state:
+    st.session_state.preview_payload = None
 
 sync_uploaded_audio()
 
@@ -284,6 +304,43 @@ analysis_sr = (
 plot_max_freq = min(20000.0, analysis_sr * 0.49)
 analysis = chain.analyze(sample_rate=analysis_sr, plot_max_freq=plot_max_freq)
 
+current_preview_signature = build_preview_signature(
+    st.session_state.audio_source,
+    analysis_sr,
+    st.session_state.audio_data if st.session_state.audio_source == "アップロード" else None,
+    line_stage_preset=line_stage_preset,
+    l_len=float(l_len),
+    l_dia=float(l_dia),
+    l_z_src=float(l_z_src),
+    l_contact_res=float(l_contact_res),
+    source_cap_pf=float(source_cap_pf),
+    input_cap_pf=float(input_cap_pf),
+    stage_bw_khz=int(stage_bw_khz),
+    settling_strength=float(settling_strength),
+    stereo_ground_coupling=float(stereo_ground_coupling),
+    shield_coverage=float(shield_coverage),
+    ingress_sensitivity=float(ingress_sensitivity),
+    plug_contamination=float(plug_contamination),
+    contact_nonlinearity=float(contact_nonlinearity),
+    amp_type=amp_type,
+    h2=float(h2),
+    h3=float(h3),
+    sr_val=float(sr_val),
+    cap_val=int(cap_val),
+    z_out_amp=float(z_out_amp),
+    z_in_amp=float(z_in_amp),
+    loop_gain_db=float(loop_gain_db),
+    input_lowpass_khz=int(input_lowpass_khz),
+    capacitive_sensitivity=float(capacitive_sensitivity),
+    stability_margin=float(stability_margin),
+    s_len=float(s_len),
+    s_dia=float(s_dia),
+    load_preset=load_preset,
+    z_l_r=float(z_l_r),
+    z_l_l=float(z_l_l),
+    speaker_load_preset=speaker_load_preset if load_preset == "Speaker (8Ω)" else None,
+)
+
 with col_plot:
     st.header("📊 システム解析モニター")
 
@@ -389,26 +446,47 @@ with col_plot:
                 original = np.asarray(current_data, dtype=np.float64)
                 processed = chain.process_audio(original, current_sr, normalize_output=False)
                 difference = processed - original
-                diff_peak = np.max(np.abs(difference))
                 difference_rms = float(np.sqrt(np.mean(difference ** 2))) if difference.size > 0 else 0.0
+                st.session_state.preview_payload = {
+                    "signature": current_preview_signature,
+                    "sample_rate": current_sr,
+                    "difference_rms": difference_rms,
+                    "original_peak": float(np.max(np.abs(original))) if original.size > 0 else 0.0,
+                    "processed_peak": float(np.max(np.abs(processed))) if processed.size > 0 else 0.0,
+                    "difference_peak": float(np.max(np.abs(difference))) if difference.size > 0 else 0.0,
+                    "original_wav": audio_to_wav_bytes(original, current_sr),
+                    "processed_wav": audio_to_wav_bytes(processed, current_sr),
+                    "difference_wav": audio_to_wav_bytes(difference, current_sr),
+                }
 
-                st.write("---")
-                st.markdown("**▼ オリジナル (Original Source)**")
-                buf_o = io.BytesIO()
-                sf.write(buf_o, original, current_sr, format="WAV")
-                st.audio(buf_o.getvalue(), format="audio/wav")
+        preview_payload = st.session_state.preview_payload
+        if preview_payload is not None:
+            is_stale = preview_payload["signature"] != current_preview_signature
+            st.write("---")
+            st.markdown("**▼ オリジナル (Original Source)**")
+            st.audio(preview_payload["original_wav"], format="audio/wav")
 
-                st.markdown("**▼ システム通過後 (Processed Chain)**")
-                buf_p = io.BytesIO()
-                sf.write(buf_p, processed, current_sr, format="WAV")
-                st.audio(buf_p.getvalue(), format="audio/wav")
+            st.markdown("**▼ システム通過後 (Processed Chain)**")
+            st.audio(preview_payload["processed_wav"], format="audio/wav")
 
-                st.caption(
-                    f"差分RMS: {difference_rms:.6f}  |  『システム通過後』も『差分音』も非正規化・未レベル合わせです。"
-                )
-                st.markdown("**▼ 差分音 (Processed - Original, 非正規化)**")
-                buf_d = io.BytesIO()
-                sf.write(buf_d, difference, current_sr, format="WAV")
-                st.audio(buf_d.getvalue(), format="audio/wav")
+            st.caption(
+                f"差分RMS: {preview_payload['difference_rms']:.6f}  |  "
+                f"Processed peak: {preview_payload['processed_peak']:.4f}  |  "
+                f"Difference peak: {preview_payload['difference_peak']:.4f}"
+            )
+            st.caption("『システム通過後』も『差分音』も非正規化・未レベル合わせです。")
+            if is_stale:
+                st.info("現在のスライダー設定とは別のプレビューです。新しい設定で聴くにはもう一度ボタンを押してにゃ。")
+            if preview_payload["processed_peak"] < 1e-4:
+                st.warning("加工後のピークがかなり小さいです。設定によってはほぼ無音に聞こえることがあります。")
 
-                st.download_button("💾 加工済みファイルを保存", buf_p.getvalue(), "processed_audio.wav", "audio/wav", use_container_width=True)
+            st.markdown("**▼ 差分音 (Processed - Original, 非正規化)**")
+            st.audio(preview_payload["difference_wav"], format="audio/wav")
+
+            st.download_button(
+                "💾 加工済みファイルを保存",
+                preview_payload["processed_wav"],
+                "processed_audio.wav",
+                "audio/wav",
+                use_container_width=True,
+            )
