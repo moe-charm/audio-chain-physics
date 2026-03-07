@@ -1,4 +1,6 @@
-import io
+import tempfile
+import uuid
+from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -15,6 +17,7 @@ from .system_chain import AudioSystemChain, LineStageConfig, PowerStageConfig
 DEFAULT_SAMPLE_RATE = 44100
 FIR_TAPS = 2048
 ANALYSIS_IR_SAMPLES = 8192
+PREVIEW_DIR = Path(tempfile.gettempdir()) / "audio_chain_physics_previews"
 
 NONLINEAR_AMP_PRESETS = {
     "カスタム": {"h2": 0.001, "h3": 0.001, "slew_rate": 50.0, "capacitor_joules": 100, "output_impedance": 0.1},
@@ -64,11 +67,25 @@ def get_audio_source_data(audio_source):
     return sweep, sr
 
 
-def audio_to_wav_bytes(data, sample_rate):
+def audio_to_wav_file(data, sample_rate, label):
+    PREVIEW_DIR.mkdir(parents=True, exist_ok=True)
     safe = np.nan_to_num(np.asarray(data, dtype=np.float64), nan=0.0, posinf=0.0, neginf=0.0)
-    buf = io.BytesIO()
-    sf.write(buf, safe, sample_rate, format="WAV", subtype="PCM_16")
-    return buf.getvalue()
+    path = PREVIEW_DIR / f"{label}_{uuid.uuid4().hex}.wav"
+    sf.write(path, safe, sample_rate, format="WAV", subtype="PCM_16")
+    return str(path)
+
+
+def cleanup_preview_files(payload):
+    if not payload:
+        return
+    for key in ("original_path", "processed_path", "difference_path"):
+        path = payload.get(key)
+        if not path:
+            continue
+        try:
+            Path(path).unlink(missing_ok=True)
+        except OSError:
+            pass
 
 
 def build_preview_signature(audio_source, current_sr, current_data, **settings):
@@ -447,6 +464,7 @@ with col_plot:
                 processed = chain.process_audio(original, current_sr, normalize_output=False)
                 difference = processed - original
                 difference_rms = float(np.sqrt(np.mean(difference ** 2))) if difference.size > 0 else 0.0
+                cleanup_preview_files(st.session_state.preview_payload)
                 st.session_state.preview_payload = {
                     "signature": current_preview_signature,
                     "sample_rate": current_sr,
@@ -454,9 +472,9 @@ with col_plot:
                     "original_peak": float(np.max(np.abs(original))) if original.size > 0 else 0.0,
                     "processed_peak": float(np.max(np.abs(processed))) if processed.size > 0 else 0.0,
                     "difference_peak": float(np.max(np.abs(difference))) if difference.size > 0 else 0.0,
-                    "original_wav": audio_to_wav_bytes(original, current_sr),
-                    "processed_wav": audio_to_wav_bytes(processed, current_sr),
-                    "difference_wav": audio_to_wav_bytes(difference, current_sr),
+                    "original_path": audio_to_wav_file(original, current_sr, "original"),
+                    "processed_path": audio_to_wav_file(processed, current_sr, "processed"),
+                    "difference_path": audio_to_wav_file(difference, current_sr, "difference"),
                 }
 
         preview_payload = st.session_state.preview_payload
@@ -464,10 +482,10 @@ with col_plot:
             is_stale = preview_payload["signature"] != current_preview_signature
             st.write("---")
             st.markdown("**▼ オリジナル (Original Source)**")
-            st.audio(preview_payload["original_wav"], format="audio/wav")
+            st.audio(preview_payload["original_path"], format="audio/wav")
 
             st.markdown("**▼ システム通過後 (Processed Chain)**")
-            st.audio(preview_payload["processed_wav"], format="audio/wav")
+            st.audio(preview_payload["processed_path"], format="audio/wav")
 
             st.caption(
                 f"差分RMS: {preview_payload['difference_rms']:.6f}  |  "
@@ -481,12 +499,13 @@ with col_plot:
                 st.warning("加工後のピークがかなり小さいです。設定によってはほぼ無音に聞こえることがあります。")
 
             st.markdown("**▼ 差分音 (Processed - Original, 非正規化)**")
-            st.audio(preview_payload["difference_wav"], format="audio/wav")
+            st.audio(preview_payload["difference_path"], format="audio/wav")
 
-            st.download_button(
-                "💾 加工済みファイルを保存",
-                preview_payload["processed_wav"],
-                "processed_audio.wav",
-                "audio/wav",
-                use_container_width=True,
-            )
+            with open(preview_payload["processed_path"], "rb") as processed_file:
+                st.download_button(
+                    "💾 加工済みファイルを保存",
+                    processed_file,
+                    "processed_audio.wav",
+                    "audio/wav",
+                    use_container_width=True,
+                )
