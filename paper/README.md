@@ -70,5 +70,13 @@ lualatex main.tex
 lualatex main.tex
 ```
 
-The current workspace used to prepare these files did not have a LaTeX
-distribution installed, so the TeX sources were written but not compiled here.
+To generate Zenodo-friendly filenames, you can also run:
+
+```powershell
+pwsh ./paper/build_pdfs.ps1
+```
+
+This creates:
+
+- `paper/dist/audio-chain-physics-paper-en.pdf`
+- `paper/dist/audio-chain-physics-paper-ja.pdf`
