@@ -6,6 +6,8 @@ Live Demo: https://audio-chain-physics.streamlit.app/
 
 Paper Drafts: [paper/README.md](./paper/README.md)
 
+Zenodo Record: https://zenodo.org/records/18898657
+
 ![App screenshot](./docs/images/app-screenshot.png)
 
 A research-oriented simulator for exploring how cable parameters, source/load
@@ -112,6 +114,7 @@ streamlit run app.py
 - [Japanese README](./README.ja.md)
 - [Architecture](./ARCHITECTURE.md)
 - [Paper drafts](./paper/README.md)
+- [Zenodo record](https://zenodo.org/records/18898657)
 
 Internal working notes are kept under `private/` and are not intended as the
 main public-facing documentation.

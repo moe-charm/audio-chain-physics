@@ -6,6 +6,8 @@
 
 論文ドラフト: [paper/README.md](./paper/README.md)
 
+Zenodo 記録: https://zenodo.org/records/18898657
+
 ![アプリのスクリーンショット](./docs/images/app-screenshot.png)
 
 ケーブルの物理特性、機器との相互作用、アンプの挙動、時間領域の崩れを
@@ -119,6 +121,7 @@ streamlit run app.py
 - [English README](./README.md)
 - [アーキテクチャ](./ARCHITECTURE.md)
 - [論文ドラフト](./paper/README.md)
+- [Zenodo 記録](https://zenodo.org/records/18898657)
 
 より細かい作業メモは `private/` にありますが、公開向けの主文書ではありません。
 
