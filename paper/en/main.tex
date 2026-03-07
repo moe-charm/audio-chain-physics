@@ -191,6 +191,22 @@ The current implementation already supports several qualitative findings.
   \item Under extreme conditions, the resulting degradation is easy to reproduce in a way that is perceptually understandable.
 \end{itemize}
 
+Figure~\ref{fig:extreme-speaker-example} shows one such extreme-condition
+simulation. By changing only three parameters in the current application
+(speaker-cable length to 50~m, conductor diameter to 5~mm, and amplifier preset
+to a tube-like model), the combined response exhibits obvious peaking, phase
+rotation, group-delay growth, and ringing in the impulse and step responses.
+This figure is intentionally presented as a model-derived illustration of a
+clearly degraded operating condition. It is not a bench measurement of a real
+hardware chain.
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=0.88\linewidth,height=0.72\textheight,keepaspectratio]{../../docs/images/extreme-speaker-chain-example.png}
+  \caption{Simulated extreme-condition example obtained by setting a 50~m speaker cable, 5~mm conductor diameter, and the tube-like amplifier preset. The figure illustrates a clearly degraded response predicted by the present model. It is a calculated example, not a direct hardware measurement.}
+  \label{fig:extreme-speaker-example}
+\end{figure}
+
 At the same time, the simulator does not yet reproduce the author's full
 listening experience under conditions that feel sufficiently persuasive. In
 particular, qualities such as veil, treble sheen, extension, soundstage shift,
