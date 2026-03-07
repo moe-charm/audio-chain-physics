@@ -17,6 +17,7 @@ from .system_chain import AudioSystemChain, LineStageConfig, PowerStageConfig
 DEFAULT_SAMPLE_RATE = 44100
 FIR_TAPS = 2048
 ANALYSIS_IR_SAMPLES = 8192
+MAX_UPLOADED_SECONDS = 180
 PREVIEW_DIR = Path(tempfile.gettempdir()) / "audio_chain_physics_previews"
 
 NONLINEAR_AMP_PRESETS = {
@@ -34,9 +35,12 @@ def sync_uploaded_audio():
     uploaded_file = st.session_state.get("uploaded_wav")
     if uploaded_file is None:
         if st.session_state.get("uploaded_audio_signature") is not None:
+            cleanup_preview_files(st.session_state.get("preview_payload"))
+            st.session_state.preview_payload = None
             st.session_state.audio_data = None
             st.session_state.sample_rate = DEFAULT_SAMPLE_RATE
             st.session_state.uploaded_audio_signature = None
+            st.session_state.upload_notice = None
         return
 
     signature = (uploaded_file.name, uploaded_file.size)
@@ -44,15 +48,34 @@ def sync_uploaded_audio():
         return
 
     uploaded_file.seek(0)
-    data, sr = sf.read(uploaded_file)
+    with sf.SoundFile(uploaded_file) as audio_file:
+        sr = int(audio_file.samplerate)
+        total_frames = int(len(audio_file))
+        max_frames = int(MAX_UPLOADED_SECONDS * sr)
+        frames_to_read = min(total_frames, max_frames)
+        data = audio_file.read(frames=frames_to_read, dtype="float64", always_2d=False)
+
+    cleanup_preview_files(st.session_state.get("preview_payload"))
+    st.session_state.preview_payload = None
     st.session_state.audio_data = data
     st.session_state.sample_rate = sr
     st.session_state.uploaded_audio_signature = signature
+    if total_frames > max_frames:
+        original_seconds = total_frames / sr
+        st.session_state.upload_notice = (
+            f"アップロード音声は {original_seconds:.1f} 秒ありました。"
+            f"Cloud 安定化のため、先頭 {MAX_UPLOADED_SECONDS} 秒だけを使用しています。"
+        )
+    else:
+        st.session_state.upload_notice = None
 
 
 def get_audio_source_data(audio_source):
     if audio_source == "アップロード":
         st.file_uploader("WAVファイルをアップロード", type=["wav"], key="uploaded_wav")
+        upload_notice = st.session_state.get("upload_notice")
+        if upload_notice:
+            st.info(upload_notice)
         current_data = st.session_state.audio_data
         current_sr = st.session_state.sample_rate if current_data is not None else DEFAULT_SAMPLE_RATE
         return current_data, current_sr
@@ -115,6 +138,8 @@ if "audio_source" not in st.session_state:
     st.session_state.audio_source = "アップロード"
 if "uploaded_audio_signature" not in st.session_state:
     st.session_state.uploaded_audio_signature = None
+if "upload_notice" not in st.session_state:
+    st.session_state.upload_notice = None
 if "preview_payload" not in st.session_state:
     st.session_state.preview_payload = None
 
