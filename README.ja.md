@@ -2,6 +2,10 @@
 
 [English README](./README.md) | [アーキテクチャ](./ARCHITECTURE.md)
 
+デモ: https://audio-chain-physics.streamlit.app/
+
+論文ドラフト: [paper/README.md](./paper/README.md)
+
 ![アプリのスクリーンショット](./docs/images/app-screenshot.png)
 
 ケーブルの物理特性、機器との相互作用、アンプの挙動、時間領域の崩れを

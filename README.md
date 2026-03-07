@@ -2,6 +2,10 @@
 
 [日本語版 README](./README.ja.md) | [Architecture](./ARCHITECTURE.md)
 
+Live Demo: https://audio-chain-physics.streamlit.app/
+
+Paper Drafts: [paper/README.md](./paper/README.md)
+
 ![App screenshot](./docs/images/app-screenshot.png)
 
 A research-oriented simulator for exploring how cable parameters, source/load
