@@ -88,6 +88,12 @@ def cleanup_preview_files(payload):
             pass
 
 
+def preview_files_exist(payload):
+    if not payload:
+        return False
+    return all(Path(payload.get(key, "")).exists() for key in ("original_path", "processed_path", "difference_path"))
+
+
 def build_preview_signature(audio_source, current_sr, current_data, **settings):
     data_shape = tuple(current_data.shape) if current_data is not None else None
     return (
@@ -478,6 +484,9 @@ with col_plot:
                 }
 
         preview_payload = st.session_state.preview_payload
+        if preview_payload is not None and not preview_files_exist(preview_payload):
+            st.session_state.preview_payload = None
+            preview_payload = None
         if preview_payload is not None:
             is_stale = preview_payload["signature"] != current_preview_signature
             st.write("---")
