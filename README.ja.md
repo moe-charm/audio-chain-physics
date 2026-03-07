@@ -6,7 +6,7 @@
 
 論文ドラフト: [paper/README.md](./paper/README.md)
 
-Zenodo 記録: https://zenodo.org/records/18898657
+Zenodo DOI: https://doi.org/10.5281/zenodo.18898657
 
 ![アプリのスクリーンショット](./docs/images/app-screenshot.png)
 
@@ -121,7 +121,7 @@ streamlit run app.py
 - [English README](./README.md)
 - [アーキテクチャ](./ARCHITECTURE.md)
 - [論文ドラフト](./paper/README.md)
-- [Zenodo 記録](https://zenodo.org/records/18898657)
+- [Zenodo DOI](https://doi.org/10.5281/zenodo.18898657)
 
 より細かい作業メモは `private/` にありますが、公開向けの主文書ではありません。
 
